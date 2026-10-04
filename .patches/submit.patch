@@ -92,7 +92,7 @@
 -            completedPages += 1;
 -            setExtractProgress(`답지 OCR 중 · ${completedPages}/${pages}장`);
 -          }
-+      const key = assessmentKey({ id: item.id, kind: "hw", title: item.title, due_at: item.due_at, score: null });
++      const key = assessmentKey({ id: item.id, kind: "hw", title: item.title, due_at: item.due_at });
 +      const data = await loadBatches("detail", (done, total) => setExtractProgress({ done, total }), key);
 +      const relevant = data.rows.filter((row) => row.item && assessmentKey(row.item) === key && row.detail?.marks?.length);
 +      const next: Record<number, string> = {};
