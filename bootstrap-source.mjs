@@ -21,10 +21,10 @@ execFileSync("tar", ["-xzf", "source-full.tar.gz", "-C", "."], {
 });
 
 console.log("Applying UI patch...");
-execFileSync("patch", ["-p0", "-i", ".patches/ui.patch"], { stdio: "inherit" });
+execFileSync("git", ["apply", ".patches/ui.patch"], { stdio: "inherit" });
 
 console.log("Applying submit patch...");
-execFileSync("patch", ["-p0", "-i", ".patches/submit.patch"], { stdio: "inherit" });
+execFileSync("git", ["apply", ".patches/submit.patch"], { stdio: "inherit" });
 
 const tsconfigPath = "tsconfig.json";
 const tsconfig = JSON.parse(readFileSync(tsconfigPath, "utf8"));
