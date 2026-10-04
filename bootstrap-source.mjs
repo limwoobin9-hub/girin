@@ -30,6 +30,6 @@ if (Array.isArray(tsconfig.compilerOptions?.types)) {
 writeFileSync(tsconfigPath, JSON.stringify(tsconfig, null, 2) + "\n");
 
 console.log("Building Next.js app...");
-execFileSync("pnpm", ["exec", "next", "build"], {
+execFileSync(process.execPath, ["node_modules/next/dist/bin/next", "build"], {
   stdio: "inherit",
 });
