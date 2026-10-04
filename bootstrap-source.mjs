@@ -1,18 +1,26 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 
-console.log("Extracting site source...");
-execFileSync("tar", ["-xzf", "source.tar.gz", "-C", "."], { stdio: "inherit" });
+const chunks = readdirSync(".source")
+  .filter((name) => /^chunk-\d+\.b64$/.test(name))
+  .sort();
 
-const ocrFile = "lib/browser-answer-ocr.ts";
-if (existsSync(ocrFile)) {
-  let source = readFileSync(ocrFile, "utf8");
-  source = source
-    .replace('workerPath: "/ocr/worker.min.js"', 'workerPath: "https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/worker.min.js"')
-    .replace('corePath: "/ocr/core"', 'corePath: "https://cdn.jsdelivr.net/npm/tesseract.js-core@6.0.0"')
-    .replace('langPath: "/ocr/lang"', 'langPath: "https://tessdata.projectnaptha.com/4.0.0"');
-  writeFileSync(ocrFile, source);
+if (!chunks.length) {
+  throw new Error("Bundled source chunks are missing.");
 }
 
+const base64 = chunks
+  .map((name) => readFileSync(`.source/${name}`, "utf8").trim())
+  .join("");
+
+writeFileSync("source-full.tar.gz", Buffer.from(base64, "base64"));
+
+console.log(`Reconstructing site source from ${chunks.length} chunks...`);
+execFileSync("tar", ["-xzf", "source-full.tar.gz", "-C", "."], {
+  stdio: "inherit",
+});
+
 console.log("Building Next.js app...");
-execFileSync("pnpm", ["exec", "next", "build"], { stdio: "inherit" });
+execFileSync("pnpm", ["exec", "next", "build"], {
+  stdio: "inherit",
+});
