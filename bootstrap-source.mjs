@@ -20,6 +20,9 @@ execFileSync("tar", ["-xzf", "source-full.tar.gz", "-C", "."], {
   stdio: "inherit",
 });
 
+console.log("Applying UI patch...");
+execFileSync("patch", ["-p0", "-i", ".patches/ui.patch"], { stdio: "inherit" });
+
 const tsconfigPath = "tsconfig.json";
 const tsconfig = JSON.parse(readFileSync(tsconfigPath, "utf8"));
 if (Array.isArray(tsconfig.compilerOptions?.types)) {
