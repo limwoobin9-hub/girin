@@ -1,0 +1,192 @@
+--- app/submit/page.tsx
++++ app/submit/page.tsx
+@@ -4,8 +4,8 @@
+ import { Button } from "@/components/ui/button";
+ import { Input } from "@/components/ui/input";
+ import { PageTabs } from "@/components/page-tabs";
+-import { compareHomeworkAge } from "@/lib/ranking";
+-import { withAnswerOcr } from "@/lib/browser-answer-ocr";
++import { assessmentKey, compareHomeworkAge } from "@/lib/ranking";
++import { loadBatches } from "@/lib/analysis";
+ 
+ type Account = { id: number; name: string };
+ type Homework = { id: number; title: string; kind: "hw"; locked: boolean; submitted_at: string | null; due_at: string | null; open_at: string | null };
+@@ -31,13 +31,11 @@
+   const [detailBusy, setDetailBusy] = useState(false);
+   const [selected, setSelected] = useState<Detail | null>(null);
+   const [answers, setAnswers] = useState<Record<number, string>>({});
+-  const [referenceName, setReferenceName] = useState("");
+-  const [extracting, setExtracting] = useState(false);
+-  const [extractProgress, setExtractProgress] = useState("");
+-  const [extractReport, setExtractReport] = useState("");
+   const [sheetPages, setSheetPages] = useState(0);
+   const [sheetOpen, setSheetOpen] = useState(true);
+   const [submitting, setSubmitting] = useState(false);
++  const [extracting, setExtracting] = useState(false);
++  const [extractProgress, setExtractProgress] = useState({ done: 0, total: 0 });
+   const [error, setError] = useState("");
+   const [notice, setNotice] = useState("");
+ 
+@@ -79,12 +77,12 @@
+     setError("");
+     try { await readJson(await fetch("/api/girin/session", { method: "DELETE", cache: "no-store" })); }
+     catch (reason) { setError(reason instanceof Error ? reason.message : "로그아웃에 실패했습니다."); return; }
+-    setAccount(null); setSelected(null); setItems([]); setName(""); setPassword(""); setNotice(""); setExtractReport("");
++    setAccount(null); setSelected(null); setItems([]); setName(""); setPassword(""); setNotice("");
+   }
+ 
+   async function open(item: Homework) {
+     if (selected?.id === item.id) { setSelected(null); return; }
+-    setSelected(null); setAnswers({}); setSheetPages(0); setSheetOpen(true); setError(""); setNotice(""); setExtractReport(""); setExtractProgress(""); setDetailBusy(true);
++    setSelected(null); setAnswers({}); setSheetPages(0); setSheetOpen(true); setError(""); setNotice(""); setDetailBusy(true);
+     try {
+       const data = await readJson(await fetch(`/api/girin/homeworks/${item.id}`, { cache: "no-store" }));
+       const detail = data as Detail;
+@@ -108,67 +106,40 @@
+     });
+   }
+ 
+-  async function extractAnswers(event: FormEvent<HTMLFormElement>) {
+-    event.preventDefault();
+-    if (!selected || !account || extracting || selected.submission) return;
+-    const sourceName = referenceName.trim().normalize("NFC");
+-    if (!sourceName) { setError("답지를 확인할 학생 이름을 입력해 주세요."); return; }
+-    if (sourceName === account.name.normalize("NFC")) { setError("제출한 다른 학생의 이름을 입력해 주세요."); return; }
+ 
+-    setExtracting(true); setError(""); setNotice(""); setExtractReport("");
++  async function extractActualAnswers(item: Homework) {
++    if (!selected || extracting || submitting) return;
++    setExtracting(true); setError(""); setNotice(""); setExtractProgress({ done: 0, total: 0 });
+     try {
+-      const info = await readJson(await fetch(`/api/answers?name=${encodeURIComponent(sourceName)}&id=${selected.id}`, { cache: "no-store" }));
+-      const pages = Number(info.pages);
+-      if (!Number.isInteger(pages) || pages < 1 || pages > 30) throw new Error("답지 페이지를 확인하지 못했습니다.");
+-
+-      const questions = new Map(selected.questions.map((question) => [question.no, question]));
+-      const extracted = new Map<number, string>();
+-      const conflicts = new Set<number>();
+-      const failedPages: number[] = [];
+-      let failureMessage = "";
+-      let completedPages = 0;
+-      setExtractProgress(`OCR 준비 중 · 0/${pages}장`);
+-
+-      await withAnswerOcr(async (readPage) => {
+-        for (let page = 1; page <= pages; page++) {
+-          setExtractProgress(`답지 OCR 중 · ${page}/${pages}장`);
+-          try {
+-            const result = await readPage(sourceName, selected.id, page);
+-            for (const no of result.conflicts) conflicts.add(no);
+-            for (const row of result.answers) {
+-              const question = questions.get(row.no);
+-              if (!question || !Array.isArray(row.choices) || row.choices.length !== question.multi ||
+-                  new Set(row.choices).size !== row.choices.length ||
+-                  !row.choices.every((choice) => Number.isInteger(choice) && choice >= 1 && choice <= question.choices)) continue;
+-              const choice = [...row.choices].sort((a, b) => a - b).join(",");
+-              if (extracted.has(row.no) && extracted.get(row.no) !== choice) {
+-                conflicts.add(row.no); // Keep the first reading for manual review.
+-              } else extracted.set(row.no, choice);
+-            }
+-          } catch (reason) {
+-            failedPages.push(page); failureMessage ||= reason instanceof Error ? reason.message : "답 추출 실패";
+-          } finally {
+-            completedPages += 1;
+-            setExtractProgress(`답지 OCR 중 · ${completedPages}/${pages}장`);
+-          }
++      const key = assessmentKey({ id: item.id, kind: "hw", title: item.title, due_at: item.due_at, score: null });
++      const data = await loadBatches("detail", (done, total) => setExtractProgress({ done, total }), key);
++      const relevant = data.rows.filter((row) => row.item && assessmentKey(row.item) === key && row.detail?.marks?.length);
++      const next: Record<number, string> = {};
++      let filled = 0;
++      for (const question of selected.questions) {
++        const confirmed = new Set<string>();
++        for (const row of relevant) {
++          const mark = row.detail?.marks.find((entry) => entry.no === question.no);
++          if (mark?.ok !== true || !mark.picked) continue;
++          const picked = mark.picked.split(",").map(Number);
++          if (picked.length !== question.multi || picked.some((choice) => !Number.isInteger(choice) || choice < 1 || choice > question.choices)) continue;
++          confirmed.add([...picked].sort((a, b) => a - b).join(","));
+         }
+-      });
+-
+-      if (!extracted.size) throw new Error(failedPages.length ? failureMessage : "확인 가능한 답을 찾지 못했습니다. 답지를 직접 확인해 주세요.");
+-      const preparedAnswers = { ...answers, ...Object.fromEntries(extracted) };
+-      setAnswers(preparedAnswers);
+-      const missing = selected.questions.filter((question) => !extracted.has(question.no)).map((question) => question.no);
+-      setExtractReport(`${sourceName} 답지에서 ${extracted.size}/${selected.questions.length}문항 적용` +
+-        (missing.length ? ` · 직접 확인: ${missing.join(", ")}번` : " · 답을 확인한 뒤 제출하세요") +
+-        (conflicts.size ? ` · 판독이 다른 문항(한 답 적용): ${[...conflicts].join(", ")}번` : "") +
+-        (failedPages.length ? ` · 읽지 못한 페이지: ${failedPages.join(", ")}장` : ""));
+-      if (failedPages.length) setError(failureMessage);
+-    } catch (reason) { setError(reason instanceof Error ? reason.message : "답지를 확인하지 못했습니다."); }
+-    finally { setExtracting(false); setExtractProgress(""); }
++        if (confirmed.size === 1) {
++          next[question.no] = [...confirmed][0];
++          filled++;
++        }
++      }
++      setAnswers(next);
++      const blank = selected.questions.length - filled;
++      setNotice(blank ? `실제 제출 기록으로 ${filled}문항을 확인했습니다. 확인되지 않은 ${blank}문항은 비워 두었습니다.` : `실제 제출 기록으로 ${filled}문항을 모두 확인했습니다.`);
++    } catch (reason) {
++      setError(reason instanceof Error ? reason.message : "실제 제출 기록에서 답을 추출하지 못했습니다.");
++    } finally { setExtracting(false); }
+   }
+ 
+   async function submit(preparedAnswers: Record<number, string> = answers) {
+-    if (!selected || submitting || extracting || selected.submission) return;
++    if (!selected || submitting || selected.submission) return;
+     if (!window.confirm(`「${selected.title}」 답안을 제출할까요? 제출 후에는 수정할 수 없습니다.`)) return;
+     setSubmitting(true); setError(""); setNotice("");
+     try {
+@@ -200,7 +171,7 @@
+         </form>
+         {error && <p className="error" role="alert">{error}</p>}
+       </section> : <>
+-        <div className="submit-account"><strong>{account.name}</strong><div><Button type="button" variant="outline" onClick={() => void refresh()} disabled={listBusy || extracting}>새로고침</Button><Button type="button" variant="outline" onClick={logout} disabled={extracting}>로그아웃</Button></div></div>
++        <div className="submit-account"><strong>{account.name}</strong><div><Button type="button" variant="outline" onClick={() => void refresh()} disabled={listBusy}>새로고침</Button><Button type="button" variant="outline" onClick={logout} >로그아웃</Button></div></div>
+         {error && <p className="error submit-error" role="alert">{error}</p>}
+         {notice && <p className="submit-notice" role="status">{notice}</p>}
+         {listBusy && <p role="status">숙제 목록 불러오는 중…</p>}
+@@ -208,7 +179,7 @@
+         <div className="cards submit-list">{items.map((item) => <article className="homework-card" key={item.id}>
+           <div className="card-heading"><h3>{item.title}</h3><span className={`status-pill ${item.submitted_at ? "is-done" : ""}`}>{item.locked ? "공개 전" : item.submitted_at ? "제출 완료" : "미제출"}</span></div>
+           {item.due_at && <div className="card-meta"><span>마감 {item.due_at}</span></div>}
+-          {!item.locked && <Button type="button" variant="outline" className="answer-open" onClick={() => open(item)} disabled={detailBusy || extracting}>{detailBusy ? "불러오는 중…" : selected?.id === item.id ? "접기" : "열기"}</Button>}
++          {!item.locked && <Button type="button" variant="outline" className="answer-open" onClick={() => open(item)} disabled={detailBusy}>{detailBusy ? "불러오는 중…" : selected?.id === item.id ? "접기" : "열기"}</Button>}
+           {selected?.id === item.id && <div className="submit-detail">
+             {!!sheetPages && <>
+               <Button type="button" variant="outline" className="sheet-toggle" aria-expanded={sheetOpen} onClick={() => setSheetOpen((before) => !before)}>
+@@ -220,25 +191,21 @@
+               </figure>)}</section>}
+             </>}
+             {selected.submission ? <p className="submit-notice">제출 완료{Number.isFinite(selected.submission.score) ? ` · ${selected.submission.score}점` : ""}</p> : <>
+-              <form className="submit-extract" onSubmit={extractAnswers}>
+-                <label htmlFor="reference-student">제출한 학생의 답지로 입력</label>
+-                <div className="submit-extract-fields">
+-                  <Input id="reference-student" value={referenceName} onChange={(event) => setReferenceName(event.target.value)} placeholder="학생 이름" maxLength={80} disabled={extracting} required />
+-                  <Button type="submit" variant="outline" disabled={extracting}>{extracting ? "추출 중…" : "답 추출·적용"}</Button>
+-                </div>
+-                <p className="answer-note">읽힌 답을 자동 입력합니다. 답지를 확인한 뒤 아래 제출 버튼을 직접 눌러 주세요.</p>
+-                {extractProgress && <p role="status">{extractProgress}</p>}
+-                {extractReport && <p className="submit-notice" role="status">{extractReport}</p>}
+-              </form>
++              <p className="answer-note">다른 계정의 실제 제출 기록에서 채점으로 확인된 답만 자동 입력할 수 있습니다. 기록이 없거나 답이 서로 충돌하는 문항은 비워 둡니다.</p>
++              <div className="submit-extract-row">
++                <Button type="button" variant="outline" onClick={() => void extractActualAnswers(item)} disabled={extracting || submitting}>
++                  {extracting ? (extractProgress.total ? `답 추출 중 · ${extractProgress.done}/${extractProgress.total}` : "답 추출 중…") : "실제 제출 기록에서 답 추출"}
++                </Button>
++              </div>
+               <h4>답 입력 · {complete}/{selected.questions.length}</h4>
+               <div className="submit-questions">{selected.questions.map((q) => <fieldset key={q.no} className="submit-question">
+                 <legend>{q.no}번{q.multi > 1 ? ` · ${q.multi}개 선택` : ""}</legend>
+                 <div className="submit-choices">{Array.from({ length: q.choices }, (_, index) => index + 1).map((choice) => {
+                   const checked = (answers[q.no] ?? "").split(",").includes(String(choice));
+-                  return <label key={choice} className={checked ? "is-picked" : ""}><input type={q.multi > 1 ? "checkbox" : "radio"} name={`question-${q.no}`} checked={checked} disabled={extracting || submitting} onChange={() => pick(q, choice)} />{choice}</label>;
++                  return <label key={choice} className={checked ? "is-picked" : ""}><input type={q.multi > 1 ? "checkbox" : "radio"} name={`question-${q.no}`} checked={checked} disabled={submitting} onChange={() => pick(q, choice)} />{choice}</label>;
+                 })}</div>
+               </fieldset>)}</div>
+-              <Button type="button" onClick={() => void submit()} disabled={submitting || extracting || complete !== selected.questions.length || !selected.questions.length} className="submit-action">
++              <Button type="button" onClick={() => void submit()} disabled={submitting || complete !== selected.questions.length || !selected.questions.length} className="submit-action">
+                 {submitting ? "제출 중…" : complete !== selected.questions.length ? `${selected.questions.length - complete}문항 남음` : "제출하기"}
+               </Button>
+             </>}
