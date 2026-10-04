@@ -6,3 +6,4 @@ The application source is stored in `source.tar.gz` and extracted automatically 
 
 Deployment target: Vercel Next.js.
 Deployment installer: npm.
+UI update in progress.
