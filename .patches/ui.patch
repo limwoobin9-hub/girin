@@ -1,0 +1,121 @@
+--- app/page.tsx
++++ app/page.tsx
+@@ -83,12 +83,47 @@
+               {analysis.unavailable > 0 && <p className="analysis-note">{analysis.unavailable}명 목록을 확인하지 못해 아래 비율은 조회된 기록 기준입니다.</p>}
+               {analysis.detailCount < analysis.submitted && <p className="analysis-note">제출자 {analysis.submitted - analysis.detailCount}명의 문항 기록은 읽지 못해 오답률에서 제외했습니다.</p>}
+               {!analysis.detail && <p className="analysis-note">이 계정의 문항별 제출 기록을 확인할 수 없습니다.</p>}
+-              <div className="question-list">{analysis.questions.map((q) => <div className={`question-line ${q.ok === false ? "is-wrong" : ""}`} key={q.no}>
+-                <strong>{q.no}번</strong><span>선택 <b>{q.picked ?? "—"}</b></span>
+-                <span>정답 <b>{q.answer ?? "확인 불가"}</b>{q.basis === "correct" && <small>맞힌 기록 {q.evidence}건</small>}{q.basis === "elimination" && <small>오답 {q.evidence}개 소거 · 추정</small>}{q.conflict && <small>맞힌 기록이 서로 다름</small>}</span>
+-                <span className="question-outcome">{q.ok === true ? "정답" : q.ok === false ? "오답" : "기록 없음"}</span>
+-                <span>오답률 <b>{q.assessed ? `${(q.wrong / q.assessed * 100).toFixed(1)}%` : "—"}</b><small>{q.wrong}/{q.assessed}건</small></span>
+-              </div>)}</div>
++              <div className="choice-legend" aria-label="선택지 색상 안내">
++                <span><i className="legend-swatch is-picked" />내 선택</span>
++                <span><i className="legend-swatch is-answer" />정답</span>
++                <span><i className="legend-swatch is-wrong-pick" />내가 고른 오답</span>
++              </div>
++              <div className="question-list">{analysis.questions.map((q) => {
++                const pickedChoices = new Set((q.picked ?? "").split(",").filter(Boolean));
++                const answerChoices = new Set((q.answer ?? "").split(",").filter(Boolean));
++                const circledChoices = ["①", "②", "③", "④", "⑤"];
++                return <div className={`question-line ${q.ok === false ? "is-wrong" : ""}`} key={q.no}>
++                  <strong className="question-number">{q.no}번</strong>
++                  <div className="question-content">
++                    <div className="question-choices" aria-label={`${q.no}번 선택지`}>
++                      {circledChoices.map((label, index) => {
++                        const value = String(index + 1);
++                        const isPicked = pickedChoices.has(value);
++                        const isAnswer = answerChoices.has(value);
++                        const isWrongPick = isPicked && q.ok === false && !isAnswer;
++                        return <span
++                          className={`choice-chip ${isPicked ? "is-picked" : ""} ${isAnswer ? "is-answer" : ""} ${isWrongPick ? "is-wrong-pick" : ""}`}
++                          key={value}
++                          title={isWrongPick ? "내가 고른 오답" : isPicked && isAnswer ? "내 선택 · 정답" : isPicked ? "내 선택" : isAnswer ? "정답" : undefined}
++                        >{label}</span>;
++                      })}
++                    </div>
++                    <div className="question-meta">
++                      <span>내 선택 <b>{q.picked ?? "—"}</b></span>
++                      <span>정답 <b>{q.answer ?? "확인 불가"}</b></span>
++                      <span className="question-outcome">{q.ok === true ? "정답" : q.ok === false ? "오답" : "기록 없음"}</span>
++                      {q.basis === "correct" && <small>맞힌 기록 {q.evidence}건</small>}
++                      {q.basis === "elimination" && <small>오답 {q.evidence}개 소거 · 추정</small>}
++                      {q.conflict && <small>맞힌 기록이 서로 다름</small>}
++                    </div>
++                  </div>
++                  <div className="question-error-rate">
++                    <span>오답률</span>
++                    <b>{q.assessed ? `${(q.wrong / q.assessed * 100).toFixed(1)}%` : "—"}</b>
++                    <small>{q.wrong}/{q.assessed}건</small>
++                  </div>
++                </div>;
++              })}</div>
+               {!analysis.questions.length && <p className="analysis-note">문항 기록이 없습니다.</p>}
+               <p className="analysis-note">정답은 맞힌 기록을 우선 사용하고, 단일 선택 문항의 모든 다른 선택지가 오답으로 확인되면 추정합니다. 근거가 부족하거나 충돌하면 표시하지 않습니다. 오답률은 채점 기록 기준입니다.</p>
+             </div>}
+--- app/globals.css
++++ app/globals.css
+@@ -137,18 +137,39 @@
+ .analysis-summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 18px; color: #526982; margin-bottom: 14px; }
+ .analysis-summary strong { color: #a52c3b; font-size: 1.15rem; }
+ .analysis-note { color: #63748b; line-height: 1.6; font-size: .88rem; margin: 13px 0 0; }
++.choice-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 10px; color: #61738a; font-size: .82rem; font-weight: 700; }
++.choice-legend span { display: inline-flex; align-items: center; gap: 6px; }
++.legend-swatch { width: 13px; height: 13px; border-radius: 4px; border: 1px solid #b8c5d5; background: #fff; }
++.legend-swatch.is-picked { background: #dbeafe; border-color: #4f7fc9; }
++.legend-swatch.is-answer { background: #dcf5e8; border-color: #42a875; }
++.legend-swatch.is-wrong-pick { background: #ffd9de; border-color: #d24a5a; }
+ .question-list { border: 1px solid #dee6f0; border-radius: 12px; overflow: hidden; }
+-.question-line { display: grid; grid-template-columns: 52px minmax(72px, .8fr) minmax(130px, 1.4fr) minmax(70px, .7fr) minmax(100px, 1fr); gap: 8px; align-items: center; padding: 12px 14px; font-size: .9rem; }
+-.question-line + .question-line { border-top: 1px solid #ebeff5; }
+-.question-line.is-wrong { background: #fff8f8; }
+-.question-line strong { color: #233c60; }
+-.question-line b { color: #173f85; }
+-.question-line.is-wrong .question-outcome { color: #aa2c39; font-weight: 800; }
+-.question-line small { display: block; margin-top: 2px; color: #677a8f; font-size: .8rem; }
++.question-line { display: grid; grid-template-columns: 52px minmax(0, 1fr) 156px; gap: 15px; align-items: stretch; padding: 13px 14px; font-size: .9rem; background: #fff; }
++.question-line + .question-line { border-top: 1px solid #e4eaf2; }
++.question-line.is-wrong { background: #ffcfd6; box-shadow: inset 5px 0 0 #c62f43; }
++.question-number { color: #233c60; }
++.question-content { min-width: 0; display: grid; gap: 9px; }
++.question-choices { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
++.choice-chip { display: inline-flex; width: 34px; height: 34px; align-items: center; justify-content: center; border: 1px solid #cbd5e1; border-radius: 9px; background: #fff; color: #50647d; font-size: 1.16rem; font-weight: 800; line-height: 1; }
++.choice-chip.is-picked { color: #1f4d8f; background: #dbeafe; border-color: #4f7fc9; }
++.choice-chip.is-answer { color: #126b45; background: #dcf5e8; border-color: #42a875; }
++.choice-chip.is-picked.is-answer { box-shadow: 0 0 0 2px #4f7fc9; }
++.choice-chip.is-wrong-pick { color: #9f2435; background: #ffd4da; border-color: #d24a5a; box-shadow: none; }
++.question-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 13px; color: #64758a; font-size: .82rem; }
++.question-meta b { color: #173f85; }
++.question-meta small { color: #677a8f; font-size: .78rem; }
++.question-outcome { color: #31557e; font-weight: 800; }
++.question-line.is-wrong .question-outcome { color: #a92538; }
++.question-error-rate { align-self: stretch; display: flex; flex-direction: column; justify-content: center; align-items: center; min-width: 0; padding: 10px 8px 10px 18px; border-left: 2px solid #d7e0eb; text-align: center; }
++.question-line.is-wrong .question-error-rate { border-left-color: #d96b79; }
++.question-error-rate span { color: #5d7088; font-size: .95rem; font-weight: 800; }
++.question-error-rate b { color: #1d477e; font-size: 1.9rem; line-height: 1.05; letter-spacing: -.05em; margin-top: 3px; }
++.question-line.is-wrong .question-error-rate b { color: #a92538; }
++.question-error-rate small { color: #6f7f94; font-size: .84rem; margin-top: 5px; }
+ .roster-controls { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 19px; }
+ .roster-controls label { display: grid; gap: 7px; min-width: 190px; flex: 1; color: #334e72; font-weight: 700; }
+ .roster-controls label:first-child { flex: 3; }
+-.roster-controls select { width: 100%; min-width: 0; min-height: 45px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 9px; background: #fff; color: #182335; font: inherit; }
++.roster-controls select { width: 100%; min-width: 0; min-height: 45px; padding: 8px 58px 8px 12px; border: 1px solid #cbd5e1; border-radius: 9px; color: #182335; font: inherit; appearance: none; -webkit-appearance: none; background-color: #fff; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23384d67' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 28px center; background-size: 16px; }
+ .roster-summary { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: baseline; margin-bottom: 12px; }
+ .roster-summary strong { font-size: 1.14rem; }
+ .roster-summary span { color: #63748b; }
+@@ -166,7 +187,11 @@
+   .status-pill { display: inline-block; margin-top: 8px; }
+   .ranking-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 10px; }
+   .cutoff-grid { grid-template-columns: 1fr; }
+-  .question-line { grid-template-columns: 46px 1fr 1fr; gap: 8px 6px; }
+-  .question-line .question-outcome { grid-column: 2; }
+-  .question-line > span:last-child { grid-column: 3; }
++  .question-line { grid-template-columns: 42px minmax(0, 1fr) 104px; gap: 9px; padding: 12px 10px; }
++  .question-choices { gap: 5px; }
++  .choice-chip { width: 30px; height: 30px; font-size: 1.05rem; border-radius: 8px; }
++  .question-meta { gap: 3px 9px; font-size: .76rem; }
++  .question-error-rate { padding-left: 9px; }
++  .question-error-rate b { font-size: 1.35rem; }
+ }
++.submit-extract-row { display: flex; align-items: center; gap: 10px; margin: 10px 0 14px; }
