@@ -46,7 +46,7 @@
 +                </div>;
 +              })}</div>
                {!analysis.questions.length && <p className="analysis-note">문항 기록이 없습니다.</p>}
-               <p className="analysis-note">정답은 맞힌 기록을 우선 사용하고, 단일 선택 문항의 모든 다른 선택지가 오답으로 확인되면 추정합니다. 근거가 부족하거나 충돌하면 표시하지 않습니다. 오답률은 채점 기록 기준입니다.</p>
+
              </div>}
 --- app/globals.css
 +++ app/globals.css
