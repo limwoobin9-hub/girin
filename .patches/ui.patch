@@ -33,9 +33,6 @@
 +                    </div>
 +                    <div className="question-meta">
 +                      <span className="question-outcome">{q.ok === true ? "정답" : q.ok === false ? "오답" : "기록 없음"}</span>
-+                      {q.basis === "correct" && <small>정답 근거 {q.evidence}건</small>}
-+                      {q.basis === "elimination" && <small>오답 {q.evidence}개 소거 · 추정</small>}
-+                      {q.conflict && <small>맞힌 기록이 서로 다름</small>}
 +                    </div>
 +                  </div>
 +                  <div className="question-error-rate">
