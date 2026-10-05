@@ -111,6 +111,77 @@ applyUnifiedPatch(".patches/ui.patch");
 console.log("Applying submit patch...");
 applyUnifiedPatch(".patches/submit.patch");
 
+console.log("Applying final mobile question layout...");
+{
+  const pagePath = "app/page.tsx";
+  let page = readFileSync(pagePath, "utf8");
+  page = page
+    .replace(/\s*<small>\{q\.assessed - q\.wrong\}\/\{q\.assessed\}건<\/small>/g, "")
+    .replace(/\s*<small>\{q\.wrong\}\/\{q\.assessed\}건<\/small>/g, "");
+  writeFileSync(pagePath, page);
+
+  const cssPath = "app/globals.css";
+  const css = readFileSync(cssPath, "utf8") + `
+/* FINAL_MOBILE_QUESTION_LAYOUT */
+.question-choices {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 3px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  flex-wrap: nowrap !important;
+}
+.choice-chip {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 34px !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1 !important;
+  justify-self: start !important;
+}
+.question-error-rate small { display: none !important; }
+
+@media (max-width: 600px) {
+  .question-line {
+    grid-template-columns: 36px minmax(0, 1fr) 88px !important;
+    gap: 6px !important;
+    padding: 11px 8px !important;
+  }
+  .question-content { min-width: 0 !important; }
+  .question-choices {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: 2px !important;
+  }
+  .choice-chip {
+    max-width: 27px !important;
+    font-size: clamp(.82rem, 3.8vw, 1rem) !important;
+    border-radius: 7px !important;
+  }
+  .question-error-rate {
+    padding: 7px 2px 7px 7px !important;
+  }
+  .question-error-rate span { font-size: .82rem !important; }
+  .question-error-rate b { font-size: 1.25rem !important; }
+}
+
+@media (max-width: 360px) {
+  .question-line {
+    grid-template-columns: 32px minmax(0, 1fr) 76px !important;
+    gap: 4px !important;
+    padding: 10px 6px !important;
+  }
+  .choice-chip {
+    max-width: 23px !important;
+    font-size: .82rem !important;
+  }
+  .question-error-rate span { font-size: .74rem !important; }
+  .question-error-rate b { font-size: 1.08rem !important; }
+}
+`;
+  writeFileSync(cssPath, css);
+}
+
 const tsconfigPath = "tsconfig.json";
 const tsconfig = JSON.parse(readFileSync(tsconfigPath, "utf8"));
 if (Array.isArray(tsconfig.compilerOptions?.types)) {
