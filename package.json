@@ -7,7 +7,8 @@
   },
   "scripts": {
     "build": "node bootstrap-source.mjs",
-    "start": "next start"
+    "start": "next start",
+    "test": "node --experimental-strip-types --test tests/admin-auth.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -37,7 +38,8 @@
     "tailwind-merge": "3.6.0",
     "tesseract.js": "6.0.1",
     "vaul": "^1.1.2",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "iron-session": "8.0.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.2.1",

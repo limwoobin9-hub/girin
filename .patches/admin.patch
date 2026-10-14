@@ -1,0 +1,207 @@
+--- a/app/api/analysis/batch/route.ts
++++ b/app/api/analysis/batch/route.ts
+@@ -1,3 +1,4 @@
++import { requireAdmin } from "@/lib/admin-auth";
+ import { NextRequest, NextResponse } from "next/server";
+ import { cohort, getDetail, getList, keyFor } from "@/lib/assessment-data";
+ 
+@@ -7,6 +8,8 @@
+ const headers = { "Cache-Control": "private, no-store" };
+ 
+ export async function POST(request: NextRequest) {
++  const adminDenied = await requireAdmin(request);
++  if (adminDenied) return adminDenied;
+   let input: unknown;
+   try { input = await request.json(); } catch { return NextResponse.json({ error: "요청 형식 오류" }, { status: 400, headers }); }
+   if (!input || typeof input !== "object") return NextResponse.json({ error: "요청 형식 오류" }, { status: 400, headers });
+--- a/app/api/analysis/target/route.ts
++++ b/app/api/analysis/target/route.ts
+@@ -1,3 +1,4 @@
++import { requireAdmin } from "@/lib/admin-auth";
+ import { NextRequest, NextResponse } from "next/server";
+ import { cohort, getDetail, getList } from "@/lib/assessment-data";
+ 
+@@ -6,6 +7,8 @@
+ const headers = { "Cache-Control": "private, no-store" };
+ 
+ export async function GET(request: NextRequest) {
++  const adminDenied = await requireAdmin(request);
++  if (adminDenied) return adminDenied;
+   const name = request.nextUrl.searchParams.get("name")?.trim().normalize("NFC") ?? "";
+   const id = request.nextUrl.searchParams.get("id") ?? "";
+   const student = cohort.find((row) => row.name.normalize("NFC") === name);
+--- a/app/api/answers/route.ts
++++ b/app/api/answers/route.ts
+@@ -1,3 +1,4 @@
++import { requireAdmin } from "@/lib/admin-auth";
+ import { NextRequest, NextResponse } from "next/server";
+ import students from "@/data/students.json";
+ import { numeric } from "@/lib/ranking";
+@@ -48,6 +49,8 @@
+ }
+ 
+ export async function GET(request: NextRequest) {
++  const adminDenied = await requireAdmin(request);
++  if (adminDenied) return adminDenied;
+   const params = request.nextUrl.searchParams;
+   const name = params.get("name")?.trim().normalize("NFC") ?? "";
+   if (!name || name.length > 80) return error("학생 이름을 입력해 주세요.", 400);
+--- a/app/api/girin/homeworks/[id]/route.ts
++++ b/app/api/girin/homeworks/[id]/route.ts
+@@ -1,3 +1,4 @@
++import { requireAdmin } from "@/lib/admin-auth";
+ import { NextRequest, NextResponse } from "next/server";
+ import { PRIVATE_HEADERS, girinError, girinFetch, readSession } from "@/lib/girin-session";
+ import { homeworkId, ownHomework } from "@/lib/girin-homework";
+@@ -5,6 +6,8 @@
+ export const runtime = "edge";
+ 
+ export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
++  const adminDenied = await requireAdmin(request);
++  if (adminDenied) return adminDenied;
+   const session = await readSession(request);
+   if (!session) return girinError("로그인이 필요합니다.", 401);
+   const id = homeworkId((await params).id);
+--- a/app/api/girin/homeworks/[id]/sheet/[page]/route.ts
++++ b/app/api/girin/homeworks/[id]/sheet/[page]/route.ts
+@@ -1,3 +1,4 @@
++import { requireAdmin } from "@/lib/admin-auth";
+ import { NextRequest } from "next/server";
+ import { PRIVATE_HEADERS, girinError, girinFetch, readSession } from "@/lib/girin-session";
+ import { homeworkId, ownHomework } from "@/lib/girin-homework";
+@@ -5,6 +6,8 @@
+ export const runtime = "edge";
+ 
+ export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string; page: string }> }) {
++  const adminDenied = await requireAdmin(request);
++  if (adminDenied) return adminDenied;
+   const session = await readSession(request);
+   if (!session) return girinError("로그인이 필요합니다.", 401);
+   const { id: rawId, page: rawPage } = await params;
+--- a/app/api/girin/homeworks/[id]/sheet/route.ts
++++ b/app/api/girin/homeworks/[id]/sheet/route.ts
+@@ -1,3 +1,4 @@
++import { requireAdmin } from "@/lib/admin-auth";
+ import { NextRequest, NextResponse } from "next/server";
+ import { PRIVATE_HEADERS, girinError, girinFetch, readSession } from "@/lib/girin-session";
+ import { homeworkId, ownHomework } from "@/lib/girin-homework";
+@@ -5,6 +6,8 @@
+ export const runtime = "edge";
+ 
+ export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
++  const adminDenied = await requireAdmin(request);
++  if (adminDenied) return adminDenied;
+   const session = await readSession(request);
+   if (!session) return girinError("로그인이 필요합니다.", 401);
+   const id = homeworkId((await params).id);
+--- a/app/api/girin/homeworks/[id]/submit/route.ts
++++ b/app/api/girin/homeworks/[id]/submit/route.ts
+@@ -1,3 +1,4 @@
++import { requireAdmin } from "@/lib/admin-auth";
+ import { NextRequest, NextResponse } from "next/server";
+ import { PRIVATE_HEADERS, girinError, girinFetch, readSession, sameOrigin } from "@/lib/girin-session";
+ import { homeworkId, ownHomework } from "@/lib/girin-homework";
+@@ -5,6 +6,8 @@
+ export const runtime = "edge";
+ 
+ export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
++  const adminDenied = await requireAdmin(request);
++  if (adminDenied) return adminDenied;
+   if (!sameOrigin(request)) return girinError("요청 출처를 확인할 수 없습니다.", 403);
+   const session = await readSession(request);
+   if (!session) return girinError("로그인이 필요합니다.", 401);
+--- a/app/api/girin/homeworks/route.ts
++++ b/app/api/girin/homeworks/route.ts
+@@ -1,3 +1,4 @@
++import { requireAdmin } from "@/lib/admin-auth";
+ import { NextRequest, NextResponse } from "next/server";
+ import { PRIVATE_HEADERS, girinError, readSession } from "@/lib/girin-session";
+ import { listHomeworks } from "@/lib/girin-homework";
+@@ -5,6 +6,8 @@
+ export const runtime = "edge";
+ 
+ export async function GET(request: NextRequest) {
++  const adminDenied = await requireAdmin(request);
++  if (adminDenied) return adminDenied;
+   const session = await readSession(request);
+   if (!session) return girinError("로그인이 필요합니다.", 401);
+   try {
+--- a/app/api/girin/login/route.ts
++++ b/app/api/girin/login/route.ts
+@@ -1,9 +1,12 @@
++import { requireAdmin } from "@/lib/admin-auth";
+ import { NextRequest, NextResponse } from "next/server";
+ import { GIRIN_ORIGIN, PRIVATE_HEADERS, girinError, issueSession, loginCookie, sameOrigin, setSession } from "@/lib/girin-session";
+ 
+ export const runtime = "edge";
+ 
+ export async function POST(request: NextRequest) {
++  const adminDenied = await requireAdmin(request);
++  if (adminDenied) return adminDenied;
+   if (!sameOrigin(request)) return girinError("요청 출처를 확인할 수 없습니다.", 403);
+   let data: unknown;
+   try { data = await request.json(); } catch { return girinError("이름과 비밀번호를 입력해 주세요.", 400); }
+--- a/app/api/girin/session/route.ts
++++ b/app/api/girin/session/route.ts
+@@ -1,15 +1,20 @@
++import { requireAdmin } from "@/lib/admin-auth";
+ import { NextRequest, NextResponse } from "next/server";
+ import { PRIVATE_HEADERS, clearSession, girinError, readSession, sameOrigin } from "@/lib/girin-session";
+ 
+ export const runtime = "edge";
+ 
+ export async function GET(request: NextRequest) {
++  const adminDenied = await requireAdmin(request);
++  if (adminDenied) return adminDenied;
+   const session = await readSession(request);
+   if (!session) return girinError("로그인이 필요합니다.", 401);
+   return NextResponse.json({ id: session.id, name: session.name }, { headers: PRIVATE_HEADERS });
+ }
+ 
+ export async function DELETE(request: NextRequest) {
++  const adminDenied = await requireAdmin(request);
++  if (adminDenied) return adminDenied;
+   if (!sameOrigin(request)) return girinError("요청 출처를 확인할 수 없습니다.", 403);
+   return clearSession(NextResponse.json({ ok: true }, { headers: PRIVATE_HEADERS }));
+ }
+--- a/app/api/homeworks/route.ts
++++ b/app/api/homeworks/route.ts
+@@ -1,3 +1,4 @@
++import { requireAdmin } from "@/lib/admin-auth";
+ import { NextRequest, NextResponse } from "next/server";
+ import students from "@/data/students.json";
+ import { numeric } from "@/lib/ranking";
+@@ -11,6 +12,8 @@
+ }
+ 
+ export async function GET(request: NextRequest) {
++  const adminDenied = await requireAdmin(request);
++  if (adminDenied) return adminDenied;
+   const name = request.nextUrl.searchParams.get("name")?.trim().normalize("NFC") ?? "";
+   if (!name || name.length > 80) return fail("학생 이름을 입력해 주세요.", 400);
+ 
+--- a/app/api/rankings/batch/route.ts
++++ b/app/api/rankings/batch/route.ts
+@@ -1,3 +1,4 @@
++import { requireAdmin } from "@/lib/admin-auth";
+ import { NextRequest, NextResponse } from "next/server";
+ import students from "@/data/students.json";
+ import { assessmentKey, numeric } from "@/lib/ranking";
+@@ -37,6 +38,8 @@
+ }
+ 
+ export async function POST(request: NextRequest) {
++  const adminDenied = await requireAdmin(request);
++  if (adminDenied) return adminDenied;
+   let input: unknown;
+   try { input = await request.json(); } catch { return NextResponse.json({ error: "요청 형식이 올바르지 않습니다." }, { status: 400, headers }); }
+   if (!input || typeof input !== "object") return NextResponse.json({ error: "요청 형식이 올바르지 않습니다." }, { status: 400, headers });
+--- a/app/layout.tsx
++++ b/app/layout.tsx
+@@ -1,5 +1,6 @@
+ import type { Metadata } from "next";
+ import "./globals.css";
++import "./admin.css";
+ 
+ export const metadata: Metadata = {
+   title: "학습 현황",

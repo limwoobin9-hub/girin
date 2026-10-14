@@ -1,6 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 
+const deployPackage = readFileSync("package.json", "utf8");
+
 const chunks = readdirSync(".source")
   .filter((name) => /^chunk-\d+\.b64$/.test(name))
   .sort();
@@ -19,6 +21,7 @@ console.log(`Reconstructing site source from ${chunks.length} chunks...`);
 execFileSync("tar", ["-xzf", "source-full.tar.gz", "-C", "."], {
   stdio: "inherit",
 });
+writeFileSync("package.json", deployPackage);
 
 function cleanPatchPath(value) {
   const path = value.split("\t", 1)[0].trim();
@@ -190,6 +193,10 @@ if (Array.isArray(tsconfig.compilerOptions?.types)) {
   );
 }
 writeFileSync(tsconfigPath, JSON.stringify(tsconfig, null, 2) + "\n");
+
+console.log("Applying admin-only access... ");
+applyUnifiedPatch(".patches/admin.patch");
+execFileSync(process.execPath, ["apply-admin-auth.mjs"], { stdio: "inherit" });
 
 console.log("Building Next.js app...");
 execFileSync(process.execPath, ["node_modules/next/dist/bin/next", "build"], {

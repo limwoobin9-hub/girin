@@ -44,3 +44,18 @@ next-env.d.ts
 /.codex/
 /outputs/
 /work/
+
+# Source generated from the bundled archive during build.
+/app/
+/components/
+/data/
+/lib/
+/public/
+/vendor/
+/components.json
+/next.config.ts
+/postcss.config.mjs
+/source-full.tar.gz
+/tsconfig.json
+*.tsbuildinfo
+/proxy.ts
