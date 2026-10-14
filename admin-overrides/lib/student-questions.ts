@@ -6,6 +6,30 @@ export type StudentQuestion = {
   created_at: string | null;
   answered_at: string | null;
 };
+export type QuestionStudent = { id: string; name: string };
+export type OwnedStudentQuestion = StudentQuestion & { student_id: string; student_name: string };
+
+export function withQuestionOwner(student: QuestionStudent, items: StudentQuestion[]): OwnedStudentQuestion[] {
+  return items.map((item) => ({ ...item, student_id: student.id, student_name: student.name }));
+}
+
+export async function readQuestionsForStudents(
+  students: QuestionStudent[],
+  read: (id: string) => Promise<StudentQuestion[]> = readStudentQuestions,
+) {
+  const records: OwnedStudentQuestion[][] = new Array(students.length);
+  const failedStudents: string[] = [];
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(4, students.length) }, async () => {
+    while (next < students.length) {
+      const index = next++;
+      const student = students[index];
+      try { records[index] = withQuestionOwner(student, await read(student.id)); }
+      catch { records[index] = []; failedStudents.push(student.name); }
+    }
+  }));
+  return { items: records.flat(), checked: students.length, unavailable: failedStudents.length };
+}
 
 function text(value: unknown, limit: number) {
   return typeof value === "string" ? value.slice(0, limit) : "";

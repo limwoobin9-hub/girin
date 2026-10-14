@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { readStudentQuestions } from "@/lib/student-questions";
+import { readQuestionsForStudents, readStudentQuestions, withQuestionOwner } from "@/lib/student-questions";
 import students from "@/data/students.json";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 const headers = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" };
+const PAGE_SIZE = 16;
 
 function fail(error: string, status: number) {
   return NextResponse.json({ error }, { status, headers });
@@ -13,6 +15,17 @@ function fail(error: string, status: number) {
 export async function GET(request: NextRequest) {
   const denied = await requireAdmin(request);
   if (denied) return denied;
+  const params = request.nextUrl.searchParams;
+  if (params.get("all") === "1") {
+    const rawBatch = params.get("batch") ?? "0";
+    const totalBatches = Math.ceil(students.length / PAGE_SIZE);
+    if (!/^\d{1,3}$/.test(rawBatch) || Number(rawBatch) >= totalBatches || params.has("image")) return fail("조회 범위가 올바르지 않습니다.", 400);
+    const batch = Number(rawBatch);
+    const group = students.slice(batch * PAGE_SIZE, (batch + 1) * PAGE_SIZE);
+    const data = await readQuestionsForStudents(group);
+    return NextResponse.json({ ...data, batch, totalBatches, totalStudents: students.length }, { headers });
+  }
+  if (params.has("all") || params.has("batch")) return fail("조회 범위가 올바르지 않습니다.", 400);
   const name = request.nextUrl.searchParams.get("name")?.trim().normalize("NFC") ?? "";
   if (!name || name.length > 80) return fail("학생 이름을 입력해 주세요.", 400);
   const student = students.find((row) => row.name.normalize("NFC") === name);
@@ -22,7 +35,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const items = await readStudentQuestions(student.id);
-    if (imageId === null) return NextResponse.json({ name: student.name, items }, { headers });
+    if (imageId === null) return NextResponse.json({ name: student.name, items: withQuestionOwner(student, items) }, { headers });
     const question = items.find((row) => row.id === Number(imageId));
     if (!question?.image) return fail("해당 질문의 이미지를 찾지 못했습니다.", 404);
     const source = await fetch(`https://hw.girinkorean.com/api/my/${student.id}/questions/${question.id}/image`, {

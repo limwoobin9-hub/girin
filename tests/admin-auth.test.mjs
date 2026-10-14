@@ -5,7 +5,7 @@ import { sealData } from "iron-session";
 import { issueAdminSession, readAdminToken, safeReturnTo, SESSION_SECONDS } from "../admin-overrides/lib/admin-session.ts";
 import { adminConfigured, verifyAdminPassword } from "../admin-overrides/lib/admin-password.ts";
 import { takeLoginAttempt } from "../admin-overrides/lib/admin-throttle.ts";
-import { normalizeQuestions, readStudentQuestions } from "../admin-overrides/lib/student-questions.ts";
+import { normalizeQuestions, readStudentQuestions, readQuestionsForStudents, withQuestionOwner } from "../admin-overrides/lib/student-questions.ts";
 
 const secret = randomBytes(48).toString("hex");
 const salt = randomBytes(16);
@@ -96,5 +96,33 @@ test("question lookup uses a read-only GET and surfaces upstream denial", async 
     globalThis.fetch = async () => new Response("", { status: 403 });
     await assert.rejects(readStudentQuestions("3291"), /허용하지 않습니다/);
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test("all-student lookup retains ownership and reports failures separately from empty records", async () => {
+  const question = normalizeQuestions([{ id: 7, body: "질문", answer: "답변", image: true }]);
+  const students = [{ id: "101", name: "가학생" }, { id: "102", name: "나학생" }, { id: "103", name: "다학생" }, { id: "104", name: "라학생" }];
+  const result = await readQuestionsForStudents(students, async (id) => {
+    if (id === "103") throw new Error("upstream unavailable");
+    return id === "104" ? [] : question;
+  });
+  assert.equal(result.checked, 4);
+  assert.equal(result.unavailable, 1);
+  assert.deepEqual(result.items.map((row) => [row.student_id, row.student_name, row.id]), [["101", "가학생", 7], ["102", "나학생", 7]]);
+  assert.equal(withQuestionOwner(students[0], question)[0].image, true);
+});
+
+test("all-student lookup bounds concurrent upstream requests", async () => {
+  let active = 0, peak = 0, calls = 0;
+  const students = Array.from({ length: 11 }, (_, id) => ({ id: String(id + 1), name: `학생${id + 1}` }));
+  const result = await readQuestionsForStudents(students, async () => {
+    calls++; active++; peak = Math.max(peak, active);
+    await new Promise((resolve) => setImmediate(resolve));
+    active--;
+    return [];
+  });
+  assert.equal(calls, students.length);
+  assert.equal(result.checked, students.length);
+  assert.equal(result.unavailable, 0);
+  assert.ok(peak > 1 && peak <= 4);
 });
 
