@@ -198,7 +198,17 @@ console.log("Applying admin-only access... ");
 applyUnifiedPatch(".patches/admin.patch");
 execFileSync(process.execPath, ["apply-admin-auth.mjs"], { stdio: "inherit" });
 
-console.log("Building Next.js app...");
-execFileSync(process.execPath, ["node_modules/next/dist/bin/next", "build"], {
-  stdio: "inherit",
-});
+// Generated folders are gitignored, so register them explicitly for Tailwind.
+{
+  const cssPath = "app/globals.css";
+  const css = readFileSync(cssPath, "utf8");
+  writeFileSync(cssPath, css.replace('@import "tailwindcss";', '@import "tailwindcss";\n@source "../app";\n@source "../components";'));
+}
+
+if (!process.argv.includes("--prepare")) {
+  console.log("Building Next.js app...");
+  execFileSync(process.execPath, ["node_modules/next/dist/bin/next", "build"], {
+    stdio: "inherit",
+  });
+}
+

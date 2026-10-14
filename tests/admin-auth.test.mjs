@@ -5,6 +5,7 @@ import { sealData } from "iron-session";
 import { issueAdminSession, readAdminToken, safeReturnTo, SESSION_SECONDS } from "../admin-overrides/lib/admin-session.ts";
 import { adminConfigured, verifyAdminPassword } from "../admin-overrides/lib/admin-password.ts";
 import { takeLoginAttempt } from "../admin-overrides/lib/admin-throttle.ts";
+import { normalizeQuestions, readStudentQuestions } from "../admin-overrides/lib/student-questions.ts";
 
 const secret = randomBytes(48).toString("hex");
 const salt = randomBytes(16);
@@ -54,6 +55,7 @@ test("missing secrets fail closed", async () => {
 
 test("return URLs stay within existing protected pages", () => {
   assert.equal(safeReturnTo("/scores?sort=new"), "/scores?sort=new");
+  assert.equal(safeReturnTo("/questions"), "/questions");
   for (const value of ["https://evil.example", "//evil.example", "/\\evil.example", "/login", "/api/answers", "/%2f%2fevil.example"]) assert.equal(safeReturnTo(value), "/");
 });
 
@@ -62,3 +64,37 @@ test("repeated attempts are throttled", () => {
   for (let i = 0; i < 10; i++) assert.equal(takeLoginAttempt(ip), 0);
   assert.ok(takeLoginAttempt(ip) > 0);
 });
+
+test("question records preserve text and answers while rejecting invalid identifiers", () => {
+  const rows = normalizeQuestions([
+    { id: 2, body: "질문\n두 번째 줄", answer: "선생님 답변", image: "image.png", created_at: "2026-10-14 09:00" },
+    { id: "3", body: "사진 질문", answer: "", image: true, created_at: "2026-10-14 10:00" },
+    { id: 2, body: "중복" }, { id: "../admin", body: "잘못된 번호" }, null,
+  ]);
+  assert.deepEqual(rows.map((row) => row.id), [3, 2]);
+  assert.equal(rows[1].body, "질문\n두 번째 줄");
+  assert.equal(rows[1].answer, "선생님 답변");
+  assert.equal(rows[0].image, true);
+  assert.equal(rows[0].answer, "");
+  assert.deepEqual(normalizeQuestions([]), []);
+  assert.throws(() => normalizeQuestions({ error: "unavailable" }));
+});
+
+test("question lookup uses a read-only GET and surfaces upstream denial", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url, options });
+    return new Response(JSON.stringify([{ id: 5, body: "질문", answer: "답변" }]), { status: 200 });
+  };
+  try {
+    const result = await readStudentQuestions("3291");
+    assert.equal(result[0].answer, "답변");
+    assert.equal(calls[0].url, "https://hw.girinkorean.com/api/my/3291/questions");
+    assert.equal(calls[0].options.method, undefined);
+    assert.equal(calls.length, 1);
+    globalThis.fetch = async () => new Response("", { status: 403 });
+    await assert.rejects(readStudentQuestions("3291"), /허용하지 않습니다/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+

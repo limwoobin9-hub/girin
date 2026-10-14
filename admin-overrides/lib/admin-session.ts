@@ -35,7 +35,8 @@ export function safeReturnTo(value: unknown): string {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || /[\\\x00-\x1f]/.test(value)) return "/";
   try {
     const url = new URL(value, "https://girin.local");
-    if (url.origin !== "https://girin.local" || !["/", "/ranking", "/scores", "/answers", "/submit"].includes(url.pathname)) return "/";
+    if (url.origin !== "https://girin.local" || !["/", "/ranking", "/scores", "/answers", "/questions", "/submit"].includes(url.pathname)) return "/";
     return `${url.pathname}${url.search}`;
   } catch { return "/"; }
 }
+
