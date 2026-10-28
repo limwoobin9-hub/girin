@@ -197,6 +197,8 @@ writeFileSync(tsconfigPath, JSON.stringify(tsconfig, null, 2) + "\n");
 console.log("Applying admin-only access... ");
 applyUnifiedPatch(".patches/admin.patch");
 execFileSync(process.execPath, ["apply-admin-auth.mjs"], { stdio: "inherit" });
+console.log("Installing target-score auto-submit...");
+execFileSync(process.execPath, ["apply-target-score.mjs"], { stdio: "inherit" });
 
 // Generated folders are gitignored, so register them explicitly for Tailwind.
 {
