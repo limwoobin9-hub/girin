@@ -10,7 +10,7 @@ export type RankCollection = {
   unavailable:number; totalStudents:number; checked:number;
 };
 const cache = new Map<string, { until:number; value:RankCollection }>();
-export async function loadProfileRankings(items:Item[],onProgress:(done:number,total:number)=>void):Promise<RankCollection>{
+export async function loadProfileRankings(studentName:string,items:Item[],onProgress:(done:number,total:number)=>void):Promise<RankCollection>{
   const keys=[...new Set(items.map(assessmentKey))].sort();
   const cacheKey=keys.join("|");
   const memo=cache.get(cacheKey);
@@ -37,7 +37,7 @@ export async function loadProfileRankings(items:Item[],onProgress:(done:number,t
     const fetchBatch=async(batch:number)=>{
       const response=await fetch("/api/rankings/batch",{method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({name:"__profile__",batch,keys:group}),cache:"no-store"});
+        body:JSON.stringify({name:studentName,batch,keys:group}),cache:"no-store"});
       const data=await response.json() as RankBatch & {error?:string};
       if(!response.ok)throw new Error(data.error||"성적 분석을 불러오지 못했습니다.");
       if(!Number.isInteger(data.totalBatches)||data.totalBatches<1||data.totalBatches>100 ||
