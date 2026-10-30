@@ -43,15 +43,6 @@
 .profile-expanded{border-top:1px solid #e4eaf2;margin-top:15px;padding-top:15px}
 .profile-detail-metrics{margin:4px 0 12px}
 .profile-answers-action{margin:14px 0}
-.profile-answer-summary{padding:11px 13px;background:#f0f5ff;color:#38547e;border-radius:8px;font-size:.87rem;font-weight:700;margin:12px 0}
-.profile-question-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:9px}
-.profile-question{padding:12px 14px;border:1px solid #dfe7f1;border-radius:10px;background:#fff;font-size:.86rem;display:grid;gap:7px}
-.profile-question.is-wrong{border-color:#f1d6d2;background:#fffafa}
-.profile-question>div:first-child{display:flex;justify-content:space-between;align-items:center;gap:10px}
-.profile-question>div:first-child span{color:#657892;font-weight:700}
-.profile-question.is-wrong>div:first-child span{color:#af544a}
-.profile-question b{color:#2e4e82}
-.profile-question>div:not(:first-child){display:flex;justify-content:space-between;gap:9px}
 .profile-muted{margin:12px 0}
 @media(max-width:780px){.profile-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.profile-identity{padding:17px}}
 @media(max-width:520px){.profile-kpi-grid{gap:8px}.profile-kpi{padding:12px}.profile-identity-avatar{width:53px;height:53px}.profile-identity h2{font-size:1.3rem}.profile-trend-card{padding:11px}.profile-task{padding:13px!important}.profile-search-hero{padding:14px}}
