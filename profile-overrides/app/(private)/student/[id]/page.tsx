@@ -11,7 +11,7 @@ import { loadProfileRankings, type RankCollection } from "@/lib/profile-rankings
 
 type Student = { id:string; name:string };
 type Profile = { student:Student; items:Assessment[] };
-type AnswerView = { detail:Detail|null; questions:QuestionAnalysis[]; submitted:number; assigned:number; unavailable:number };
+type AnswerView = { detail:Detail|null; questions:QuestionAnalysis[]; submitted:number; eligible:number; detailCount:number; unavailable:number };
 const RECENT = "girin:selected-student:v1";
 
 function scoreLabel(value:number|null){return value===null?"미채점":`${value}점`;}
@@ -119,7 +119,8 @@ export default function StudentProfilePage(){
       const relevant=data.rows.filter(row=>row.item&&assessmentKey(row.item)===key);
       setAnswers(previous=>({...previous,[key]:{
         detail:target.detail,questions:analyzeQuestions(item,target.detail,relevant),
-        unavailable:data.unavailable,assigned:relevant.length,
+        unavailable:data.unavailable,eligible:relevant.length,
+        detailCount:relevant.filter(row=>!!row.detail?.marks.length).length,
         submitted:relevant.filter(row=>!!row.item?.submitted_at).length
       }}));
     }catch(reason){setDetailError(reason instanceof Error?reason.message:"문항별 분석 실패");}
@@ -195,17 +196,47 @@ export default function StudentProfilePage(){
                       </Button>
                     </div>
                     {answerKey===key&&analysis&&<>
-                      <div className="profile-answer-summary">본인 오답 {analysis.questions.filter(q=>q.ok===false).length}문항
-                        · 제출 {analysis.submitted}/{analysis.assigned}명 · 문항별 기록 분석</div>
-                      <div className="profile-question-grid">{analysis.questions.map(q=><div key={q.no}
-                        className={`profile-question ${q.ok===false?"is-wrong":""}`}>
-                        <div><strong>{q.no}번</strong><span>{q.ok===true?"정답":q.ok===false?"오답":"기록 없음"}</span></div>
-                        <div>선택한 답 <b>{q.picked??"—"}</b></div>
-                        <div>확인된 정답 <b>{q.answer??"확인 불가"}</b></div>
-                        <div>정답률 <b>{q.assessed?((q.assessed-q.wrong)/q.assessed*100).toFixed(1)+"%":"—"}</b></div>
-                      </div>)}</div>
-                      {analysis.unavailable>0&&<p className="profile-muted">조회할 수 없는 {analysis.unavailable}명의 기록은 정답률에서 제외했습니다.</p>}
-                      {!analysis.questions.length&&<p className="profile-muted">문항별 채점 기록이 없습니다.</p>}
+                      <div className="analysis-panel" aria-live="polite">
+              <div className="analysis-summary"><strong>{analysis.questions.filter((q) => q.ok === false).length}개 오답</strong><span>제출 {analysis.submitted}/{analysis.eligible}명</span><span>문항 기록 {analysis.detailCount}명</span></div>
+              {analysis.unavailable > 0 && <p className="analysis-note">{analysis.unavailable}명 목록을 확인하지 못해 아래 비율은 조회된 기록 기준입니다.</p>}
+              {analysis.detailCount < analysis.submitted && <p className="analysis-note">제출자 {analysis.submitted - analysis.detailCount}명의 문항 기록은 읽지 못해 정답률에서 제외했습니다.</p>}
+              {!analysis.detail && <p className="analysis-note">이 계정의 문항별 제출 기록을 확인할 수 없습니다.</p>}
+              <div className="choice-legend" aria-label="선택지 색상 안내">
+                <span><i className="legend-swatch is-answer" />정답</span>
+                <span><i className="legend-swatch is-wrong-pick" />내가 고른 오답</span>
+              </div>
+              <div className="question-list">{analysis.questions.map((q) => {
+                const pickedChoices = new Set((q.picked ?? "").split(",").filter(Boolean));
+                const answerChoices = new Set((q.answer ?? "").split(",").filter(Boolean));
+                const circledChoices = ["①", "②", "③", "④", "⑤"];
+                return <div className={`question-line ${q.ok === false ? "is-wrong" : ""}`} key={q.no}>
+                  <strong className="question-number">{q.no}번</strong>
+                  <div className="question-content">
+                    <div className="question-choices" aria-label={`${q.no}번 선택지`}>
+                      {circledChoices.map((label, index) => {
+                        const value = String(index + 1);
+                        const isPicked = pickedChoices.has(value);
+                        const isAnswer = answerChoices.has(value);
+                        const isWrongPick = isPicked && q.ok === false && !isAnswer;
+                        return <span
+                          className={`choice-chip ${isAnswer ? "is-answer" : ""} ${isWrongPick ? "is-wrong-pick" : ""}`}
+                          key={value}
+                          title={isWrongPick ? "내가 고른 오답" : isAnswer ? "정답" : undefined}
+                        >{label}</span>;
+                      })}
+                    </div>
+                    <div className="question-meta">
+                      <span className="question-outcome">{q.ok === true ? "정답" : q.ok === false ? "오답" : "기록 없음"}</span>
+                    </div>
+                  </div>
+                  <div className="question-error-rate">
+                    <span>정답률</span>
+                    <b>{q.assessed ? `${((q.assessed - q.wrong) / q.assessed * 100).toFixed(1)}%` : "—"}</b>
+                  </div>
+                </div>;
+              })}</div>
+              {!analysis.questions.length && <p className="analysis-note">문항 기록이 없습니다.</p>}
+                      </div>
                     </>}
                   </>}
                   {!item.submitted_at&&<p className="profile-muted">아직 제출하지 않은 과제입니다. 제출한 뒤 문항별 답안이 표시됩니다.</p>}
