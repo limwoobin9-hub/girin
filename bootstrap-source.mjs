@@ -199,6 +199,8 @@ applyUnifiedPatch(".patches/admin.patch");
 execFileSync(process.execPath, ["apply-admin-auth.mjs"], { stdio: "inherit" });
 console.log("Installing target-score auto-submit...");
 execFileSync(process.execPath, ["apply-target-score.mjs"], { stdio: "inherit" });
+console.log("Applying unified profile redesign...");
+execFileSync(process.execPath, ["apply-profile-redesign.mjs"], { stdio: "inherit" });
 
 // Generated folders are gitignored, so register them explicitly for Tailwind.
 {
